@@ -59,9 +59,8 @@ def collector(servers=None, interval=15 * 60, active=True):
                 if not servers:
                     result.extend(func())
                 else:
-                    timestamp = (
-                        str(datetime.now().isoformat(timespec="seconds")) + "+01:00"
-                    )
+                    timestamp = f"{datetime.now().isoformat(timespec="seconds")}+01:00"
+
                     for server in servers:
                         try:
                             server.create_session()
