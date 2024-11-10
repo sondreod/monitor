@@ -1,0 +1,26 @@
+[project]
+name = "monitor"
+authors = [{name = "Sondre S. Ødegård"}]
+license = {file = "LICENSE"}
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Topic :: System :: Monitoring",
+]
+dynamic = ["version"]
+dependencies = [
+    "paramiko",
+]
+
+[project.urls]
+Source = "https://github.com/sondreod/monitor"
+Documentation = "https://github.com/sondreod/monitor"
+
+
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+]
