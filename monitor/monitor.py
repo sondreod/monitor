@@ -6,18 +6,22 @@ import http.server
 import socketserver
 from multiprocessing import Process
 from time import sleep
+import sqlite3
 
-from paramiko import SSHClient
+import fabric
 
-PORT = 1337
+
+PORT = 1234
 STORAGE_PATH = Path("~/.local/share/monitor/").expanduser()
+
 if not STORAGE_PATH.is_dir():
     STORAGE_PATH.mkdir(exist_ok=True, parents=True)
 
+db = sqlite3.connect(STORAGE_PATH / "timeseries.db")
 collectors = []
 
 
-def run():
+def run(start_server=True):
     """
     - serve the generated static files #set cache headers?
     - serve dashboard as json?
@@ -33,15 +37,17 @@ def run():
             print(f"Listing on port {PORT}")
             httpd.serve_forever()
 
-    p = Process(target=serve)
-    p.start()
+    if start_server:
+        p = Process(target=serve)
+        p.start()
     try:
         while True:
             [f() for f in collectors]
             sleep(60)
     except KeyboardInterrupt:
-        p.terminate()
-        p.join()
+        if start_server:
+            p.terminate()
+            p.join()
 
 
 def collector(servers=None, interval=15 * 60, active=True):
@@ -63,16 +69,13 @@ def collector(servers=None, interval=15 * 60, active=True):
 
                     for server in servers:
                         try:
-                            server.create_session()
                             for m in func(server):
                                 m.timestamp = timestamp
                                 result.append(m)
-                            server.close_session()
                         except Exception as e:
                             result.append(
                                 Metric("monitor_error", str(e), server.hostname)
                             )
-                            server.close_session()
 
                 [x.save() for x in result]
 
@@ -91,24 +94,18 @@ class Server:
         self.hostname = hostname
         self.username = username
         self.collectors = collectors or set()
-        self.local = False
-        self.ssh_client = None
+        self.connection = None
 
         if self.hostname == "localhost":
             self.local = True
+        else:
+            self.local = False
 
-    def create_session(self):
+        self.connect()
+
+    def connect(self):
         if not self.local:
-            self.ssh_client = SSHClient()
-            self.ssh_client.load_system_host_keys()
-
-    def close_session(self, *args):
-        if self.ssh_client:
-            self.ssh_client.close()
-
-    def __del__(self):
-        if self.ssh_client:
-            self.ssh_client.close()
+            self.connection = fabric.Connection(self.hostname, user=self.username)
 
     def run_command(self, command: str):
         if self.local:
@@ -120,12 +117,13 @@ class Server:
                 raise RuntimeError(" ".join(err))
             return result.stdout.splitlines()
         else:
-            self.ssh_client.connect(hostname=self.hostname, username=self.username)
-            stdin, stdout, stderr = self.ssh_client.exec_command(command)
-            err = stderr.readlines()
+            r = self.connection.run(command, hide=True)
+            err = r.stderr
             if err:
                 raise RuntimeError(" ".join(err))
-            return stdout.readlines()
+
+            stdout = r.stdout.strip()
+            return [stdout]
 
     def __hash__(self):
         return hash((self.hostname, self.username))
@@ -139,17 +137,24 @@ class Metric:
         self.name = name
         self.value = value
         self.hostname = hostname
-        self.timestamp = (
-            str(timestamp or datetime.now().isoformat(timespec="seconds")) + "+01:00"
-        )
+        self.timestamp = str(timestamp or int(datetime.now().timestamp()))
 
     def serialize(self):
         return f"{self.value},{self.hostname},{self.timestamp}\n"
 
-    def save(self):
+    def __repr__(self):
+        return f"Metric('{self.name}', {self.value}, '{self.hostname}')"
 
-        with (STORAGE_PATH / f"{self.name}.csv").open("a") as fd:
-            fd.write(self.serialize())
+    def save(self):
+        sql = """
+        INSERT INTO metrics
+            (timestamp, name, value, hostname)
+        VALUES
+            (?,?,?,?)"""
+        db.execute(
+            sql, (int(datetime.now().timestamp()), self.name, self.value, self.hostname)
+        )
+        db.commit()
 
 
 def make_inventory(inventory: dict) -> list[Server]:

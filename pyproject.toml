@@ -10,14 +10,13 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "paramiko",
+    "fabric",
+    "fastapi[standard]",
 ]
 
 [project.urls]
 Source = "https://github.com/sondreod/monitor"
 Documentation = "https://github.com/sondreod/monitor"
-
-
 
 [project.optional-dependencies]
 dev = [
