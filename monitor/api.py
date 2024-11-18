@@ -7,9 +7,8 @@ from monitor import __version__
 from monitor.config import STORAGE_PATH
 
 db = sqlite3.connect(STORAGE_PATH / "timeseries.db")
-try:
-    db.execute("select count(1) from metrics;").fetchone()
-except sqlite3.OperationalError:
+
+if not db.execute("PRAGMA table_info('metrics');").fetchone():
     sql_statemtents = (
         """
     CREATE TABLE "metrics" (
@@ -36,6 +35,7 @@ except sqlite3.OperationalError:
         """,
     )
     [db.execute(sql) for sql in sql_statemtents]
+    db.commit()
 
 
 def f(query, start, end):
