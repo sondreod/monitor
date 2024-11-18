@@ -1,5 +1,5 @@
+import json
 import subprocess
-import functools
 from pathlib import Path
 from datetime import datetime
 import http.server
@@ -18,10 +18,10 @@ if not STORAGE_PATH.is_dir():
     STORAGE_PATH.mkdir(exist_ok=True, parents=True)
 
 db = sqlite3.connect(STORAGE_PATH / "timeseries.db")
-collectors = []
+registry = {}
 
 
-def run(start_server=True):
+def run(inventory_file, start_server=True):
     """
     - serve the generated static files #set cache headers?
     - serve dashboard as json?
@@ -42,51 +42,27 @@ def run(start_server=True):
         p.start()
     try:
         while True:
-            [f() for f in collectors]
-            sleep(60)
+            i = parse_inventory_file(inventory_file)
+            for server in i:
+                for collector in server.collectors:
+                    [print(c.save()) for c in registry.get(collector)(server)]
+
+            break
     except KeyboardInterrupt:
         if start_server:
             p.terminate()
             p.join()
 
 
-def collector(servers=None, interval=15 * 60, active=True):
-    """Decorator running the collect *func* on all servers and
-    gathering the result."""
-    # TODO: Implement interval
+def collector(interval=15 * 60):
+    """Use this functoin as a decorator to register a collector"""
 
-    def decorator_collector(func):
+    def wrapper(func):
+        func.interval = interval
+        registry[func.__name__] = func
+        return func
 
-        @functools.wraps(func)
-        def wrapper():
-            result = []
-
-            if active:
-                if not servers:
-                    result.extend(func())
-                else:
-                    timestamp = f"{datetime.now().isoformat(timespec="seconds")}+01:00"
-
-                    for server in servers:
-                        try:
-                            for m in func(server):
-                                m.timestamp = timestamp
-                                result.append(m)
-                        except Exception as e:
-                            result.append(
-                                Metric("monitor_error", str(e), server.hostname)
-                            )
-
-                [x.save() for x in result]
-
-            return result
-
-        wrapper.interval = interval
-        collectors.append(wrapper)
-
-        return wrapper
-
-    return decorator_collector
+    return wrapper
 
 
 class Server:
@@ -155,7 +131,30 @@ class Metric:
             sql, (int(datetime.now().timestamp()), self.name, self.value, self.hostname)
         )
         db.commit()
+        return self
 
 
-def make_inventory(inventory: dict) -> list[Server]:
-    return [Server(hostname, **config) for hostname, config in inventory.items()]
+def parse_inventory_file(inventory_filepath: str) -> dict[str, Server]:
+    with Path(inventory_filepath).open("r") as fd:
+        inventory = json.load(fd)
+        servers = []
+        collection_groups = {}
+        for k, v in inventory.items():
+            if isinstance(v, list):
+                collection_groups[k] = set(v)
+            elif isinstance(v, dict):
+                servers.append(Server(k, **v))
+            else:
+                raise RuntimeWarning(f"Can't parse inventory item: {k} {v}")
+
+        for server in servers:
+            new_collectors = set()
+            for c in server.collectors:
+                if c in collection_groups:
+
+                    new_collectors = new_collectors | collection_groups[c]
+                    server.collectors.remove(c)
+            if new_collectors:
+                server.collectors.extend(new_collectors)
+
+        return servers

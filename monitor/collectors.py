@@ -2,17 +2,10 @@ import re
 import subprocess
 from datetime import datetime
 
-from monitor import make_inventory, Metric, collector, run
+from monitor import Metric, collector, run
 
 
-inventory = make_inventory(
-    {
-        "localhost": {},
-    }
-)
-
-
-@collector(inventory)
+@collector()
 def cpu_usage(server):
     if not server.local:
         usage = server.run_command(
@@ -22,7 +15,7 @@ def cpu_usage(server):
         yield Metric("cpu_usage", usage, server.hostname)
 
 
-@collector(inventory)
+@collector()
 def cpu_load(server):
 
     load_1m, load5m, load15m, *_ = server.run_command("cat /proc/loadavg")[0].split(" ")
@@ -36,7 +29,7 @@ def cpu_load(server):
     yield Metric("cpu_load_m1", float(load_1m) / num_of_cores, server.hostname)
 
 
-@collector(inventory)
+@collector()
 def memory_usage(server):
     out = server.run_command("free -m")
     total, *_, available = re.findall(
@@ -54,7 +47,7 @@ def memory_usage(server):
     )
 
 
-@collector(inventory)
+@collector()
 def disk_usage(server):
     mount_point = "/"
     data = "\n".join(server.run_command(f"df -h {mount_point}"))
@@ -71,7 +64,7 @@ def days_left_to_tg():
     yield Metric("days_left_for_tg", (datetime(2025, 4, 14) - datetime.now()).days)
 
 
-@collector(inventory)
+@collector()
 def ping(server):
     if not server.local:
         result = subprocess.run(
@@ -87,7 +80,7 @@ def ping(server):
         )
 
 
-@collector(inventory)
+@collector()
 def uptime(server):
     out = server.run_command("uptime")
 
@@ -105,4 +98,4 @@ def uptime(server):
     )
 
 
-run(start_server=False)
+run("inventory.json", start_server=False)

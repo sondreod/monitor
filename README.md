@@ -1,6 +1,6 @@
-# Monitor
+# Monitor (WIP)
 
-Simple monitoring tool for servers and applications.
+Simple monitoring tool for servers and applications. This is a work in progress, not ready, not stable.
 
 ## Install
 
@@ -13,10 +13,10 @@ cd monitor
 ```
 
 
-### Grafana and csv-source plugin
+### Grafana
+Monitor is compliant with a small subset of the Prometeus protocol. So use the Prometeus source in Grafana to connect.
 ```shell script
 #install grafana deb package
-/usr/share/grafana/bin/grafana cli plugins install yesoreyeram-infinity-datasource
 sudo systemctl restart grafana-server
 sudo systemctl enable grafana-server
 ```
