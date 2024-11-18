@@ -1,16 +1,42 @@
 import itertools
 import sqlite3
 
-from monitor import __version__
-from monitor.config import STORAGE_PATH
-
 from fastapi import FastAPI
 
 from monitor import __version__
+from monitor.config import STORAGE_PATH
 
-# df = pl.read_parquet("~/.local/share/monitor/*.parquet")
 
 db = sqlite3.connect(STORAGE_PATH / "timeseries.db")
+try:
+    db.execute("select count(1) from metrics;").fetchone()
+except sqlite3.OperationalError:
+    sql_statemtents = (
+        """
+    CREATE TABLE "metrics" (
+        "metric_id"	INTEGER NOT NULL UNIQUE,
+        "timestamp"	BLOB NOT NULL,
+        "name"	TEXT NOT NULL,
+        "value"	TEXT NOT NULL,
+        "hostname"	TEXT,
+        "labels"	TEXT,
+        PRIMARY KEY("metric_id" AUTOINCREMENT)
+    ); """,
+        """
+    CREATE INDEX "timestamp_idx" ON "metrics" (
+        "timestamp"	DESC
+    ); """,
+        """
+    CREATE INDEX "hostname_idx" ON "metrics" (
+        "hostname"
+    );""",
+        """
+    CREATE INDEX "name_idx" ON "metrics" (
+        "name"
+    );
+        """,
+    )
+    [db.execute(sql) for sql in sql_statemtents]
 
 
 def f(query, start, end):
