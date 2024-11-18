@@ -1,8 +1,159 @@
 import re
+import json
+import sqlite3
 import subprocess
+from time import sleep
+from pathlib import Path
 from datetime import datetime
+from multiprocessing import Process
 
-from monitor import Metric, collector, run
+import fabric
+import uvicorn
+
+from monitor.config import STORAGE_PATH
+
+registry = {}
+db = sqlite3.connect(STORAGE_PATH / "timeseries.db")
+
+
+def run(inventory_file, app=None, port=None):
+    """
+    - serve the generated static files #set cache headers?
+    - serve dashboard as json?
+    - reducers should calculate min/max/avg/std fields?
+    """
+
+    def serve():
+        uvicorn.run(app, port=port or 8000)
+
+    if app:
+        p = Process(target=serve)
+        p.start()
+    try:
+        while True:
+            i = parse_inventory_file(inventory_file)
+            for server in i:
+                for collector in server.collectors:
+                    try:
+                        [print(c.save()) for c in registry.get(collector)(server)]
+                    except TypeError as e:
+                        raise RuntimeError(
+                            f"Could not find collector: {collector}.\nError: {e}"
+                        )
+
+            sleep(60)
+    except KeyboardInterrupt:
+        if app:
+            p.terminate()
+            p.join()
+
+
+def collector(interval=15 * 60):
+    """Use this functoin as a decorator to register a collector"""
+
+    def wrapper(func):
+        func.interval = interval
+        registry[func.__name__] = func
+        return func
+
+    return wrapper
+
+
+class Server:
+    def __init__(self, hostname, collectors=None, username="debian"):
+        self.hostname = hostname
+        self.username = username
+        self.collectors = collectors or set()
+        self.connection = None
+
+        if self.hostname == "localhost":
+            self.local = True
+        else:
+            self.local = False
+
+        self.connect()
+
+    def connect(self):
+        if not self.local:
+            self.connection = fabric.Connection(self.hostname, user=self.username)
+
+    def run_command(self, command: str):
+        if self.local:
+            result = subprocess.run(
+                [command], shell=True, capture_output=True, text=True
+            )
+            err = result.stderr
+            if err:
+                raise RuntimeError(" ".join(err))
+            return result.stdout.splitlines()
+        else:
+            r = self.connection.run(command, hide=True)
+            err = r.stderr
+            if err:
+                raise RuntimeError(" ".join(err))
+
+            stdout = r.stdout.strip()
+            return [stdout]
+
+    def __hash__(self):
+        return hash((self.hostname, self.username))
+
+    def __repr__(self):
+        return f'Server("{self.hostname}")'
+
+
+class Metric:
+    def __init__(self, name, value, hostname=None, timestamp=None):
+        self.name = name
+        self.value = value
+        self.hostname = hostname
+        self.timestamp = str(timestamp or int(datetime.now().timestamp()))
+
+    def serialize(self):
+        return f"{self.value},{self.hostname},{self.timestamp}\n"
+
+    def __repr__(self):
+        return f"Metric('{self.name}', {self.value}, '{self.hostname}')"
+
+    def save(self):
+        sql = """
+        INSERT INTO metrics
+            (timestamp, name, value, hostname)
+        VALUES
+            (?,?,?,?)"""
+
+        db.execute(
+            sql, (int(datetime.now().timestamp()), self.name, self.value, self.hostname)
+        )
+        db.commit()
+
+        return self
+
+
+def parse_inventory_file(inventory_filepath: str) -> dict[str, Server]:
+    with Path(inventory_filepath).open("r") as fd:
+        inventory = json.load(fd)
+        servers = []
+        collection_groups = {}
+        for k, v in inventory.items():
+            if isinstance(v, list):
+                collection_groups[k] = set(v)
+            elif isinstance(v, dict):
+                servers.append(Server(k, **v))
+            else:
+                raise RuntimeWarning(f"Can't parse inventory item: {k} {v}")
+
+        for server in servers:
+            new_collectors = set()
+            for c in server.collectors:
+                if c in collection_groups:
+
+                    new_collectors = new_collectors | collection_groups[c]
+                    server.collectors.remove(c)
+            if new_collectors:
+                server.collectors.extend(new_collectors)
+
+        return servers
 
 
 @collector()
@@ -60,7 +211,7 @@ def disk_usage(server):
 
 
 @collector(interval=60 * 60 * 24)
-def days_left_to_tg():
+def days_left_to_tg(_):
     yield Metric("days_left_for_tg", (datetime(2025, 4, 14) - datetime.now()).days)
 
 
@@ -96,6 +247,3 @@ def uptime(server):
         days,
         server.hostname,
     )
-
-
-run("inventory.json", start_server=False)

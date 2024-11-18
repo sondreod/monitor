@@ -1,13 +1,12 @@
-import json
 import itertools
 import sqlite3
 
 from monitor import __version__
-from monitor.monitor import STORAGE_PATH
+from monitor.config import STORAGE_PATH
 
 from fastapi import FastAPI
 
-# from monitor import __version__
+from monitor import __version__
 
 # df = pl.read_parquet("~/.local/share/monitor/*.parquet")
 
