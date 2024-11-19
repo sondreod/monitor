@@ -6,33 +6,25 @@ from fastapi import FastAPI
 from monitor import __version__
 from monitor.config import STORAGE_PATH
 
+if not STORAGE_PATH.is_dir():
+    STORAGE_PATH.mkdir(exist_ok=True, parents=True)
+
 db = sqlite3.connect(STORAGE_PATH / "timeseries.db")
 
 if not db.execute("PRAGMA table_info('metrics');").fetchone():
     sql_statemtents = (
-        """
-    CREATE TABLE "metrics" (
-        "metric_id"	INTEGER NOT NULL UNIQUE,
-        "timestamp"	BLOB NOT NULL,
-        "name"	TEXT NOT NULL,
-        "value"	TEXT NOT NULL,
-        "hostname"	TEXT,
-        "labels"	TEXT,
-        PRIMARY KEY("metric_id" AUTOINCREMENT)
-    ); """,
-        """
-    CREATE INDEX "timestamp_idx" ON "metrics" (
-        "timestamp"	DESC
-    ); """,
-        """
-    CREATE INDEX "hostname_idx" ON "metrics" (
-        "hostname"
-    );""",
-        """
-    CREATE INDEX "name_idx" ON "metrics" (
-        "name"
-    );
-        """,
+        """CREATE TABLE "metrics" (
+            "metric_id"	INTEGER NOT NULL UNIQUE,
+            "timestamp"	BLOB NOT NULL,
+            "name"	TEXT NOT NULL,
+            "value"	TEXT NOT NULL,
+            "hostname"	TEXT,
+            "labels"	TEXT,
+            PRIMARY KEY("metric_id" AUTOINCREMENT)
+        ); """,
+        'CREATE INDEX "timestamp_idx" ON "metrics" ("timestamp"	DESC);',
+        'CREATE INDEX "hostname_idx" ON "metrics" ( "hostname");',
+        'CREATE INDEX "name_idx" ON "metrics" ( "name");',
     )
     [db.execute(sql) for sql in sql_statemtents]
     db.commit()

@@ -21,6 +21,7 @@ def run(inventory_file, app=None, port=None):
     - serve the generated static files #set cache headers?
     - serve dashboard as json?
     - reducers should calculate min/max/avg/std fields?
+    - toml config? pyinfra inventory?
     """
 
     def serve():
