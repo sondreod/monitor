@@ -63,14 +63,10 @@ def collector(interval=15 * 60):
 class Server:
     def __init__(self, hostname, collectors=None, username="debian"):
         self.hostname = hostname
+        self.local = self.hostname in ("localhost", "127.0.0.1", "::")
         self.username = username
         self.collectors = collectors or set()
         self.connection = None
-
-        if self.hostname == "localhost":
-            self.local = True
-        else:
-            self.local = False
 
         self.connect()
 
