@@ -7,4 +7,4 @@ app = FastAPI()
 app.mount("/api/v1", v1)
 
 
-run("monitor/inventory.json", app=app)
+run("monitor/inventory.toml", app=app)

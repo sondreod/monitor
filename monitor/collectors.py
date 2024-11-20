@@ -128,7 +128,7 @@ class Metric:
 
 
 def parse_inventory_file(inventory_filepath: str) -> dict[str, Server]:
-    with Path(inventory_filepath).open("r") as fd:
+    with Path(inventory_filepath).open("rb") as fd:
         inventory = tomllib.load(fd)
         servers = []
         collection_groups = {}

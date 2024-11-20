@@ -2,11 +2,11 @@ default_server_metrics = ["memory_usage", "ping", "disk_usage", "uptime", "cpu_u
 
 [groundwave]
 username = "groundwave"
-collectors = "default_server_metrics"
+collectors = ["default_server_metrics"]
 
 [node]
 username = "root"
-collectors = "default_server_metrics"
+collectors = ["default_server_metrics"]
 
 [localhost]
 username = "ubuntu"
