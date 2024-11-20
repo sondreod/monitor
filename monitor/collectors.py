@@ -1,4 +1,4 @@
-import json
+import tomllib
 import re
 import sqlite3
 import subprocess
@@ -50,7 +50,7 @@ def run(inventory_file, app=None, port=None):
 
 
 def collector(interval=15 * 60):
-    """Use this functoin as a decorator to register a collector"""
+    """Use this function as a decorator to register a collector"""
 
     def wrapper(func):
         func.interval = interval
@@ -133,7 +133,7 @@ class Metric:
 
 def parse_inventory_file(inventory_filepath: str) -> dict[str, Server]:
     with Path(inventory_filepath).open("r") as fd:
-        inventory = json.load(fd)
+        inventory = tomllib.load(fd)
         servers = []
         collection_groups = {}
         for k, v in inventory.items():
@@ -142,7 +142,7 @@ def parse_inventory_file(inventory_filepath: str) -> dict[str, Server]:
             elif isinstance(v, dict):
                 servers.append(Server(k, **v))
             else:
-                raise RuntimeWarning(f"Can't parse inventory item: {k} {v}")
+                raise RuntimeError(f"Can't parse inventory item: {k} {v}")
 
         for server in servers:
             new_collectors = set()
@@ -161,7 +161,7 @@ def parse_inventory_file(inventory_filepath: str) -> dict[str, Server]:
 def cpu_usage(server):
     if not server.local:
         usage = server.run_command(
-            """awk '{u=$2+$4; t=$2+$4+$5; if (NR==1){u1=u; t1=t;} else print ($2+$4-u1) * 100 / (t-t1); }' <(grep 'cpu ' /proc/stat) <(sleep 1;grep 'cpu ' /proc/stat)"""
+            """awk '{u=$2+$4; t=$2+$4+$5;43221 if (NR==1){u1=u; t1=t;} else print ($2+$4-u1) * 100 / (t-t1); }' <(grep 'cpu ' /proc/stat) <(sleep 1;grep 'cpu ' /proc/stat)"""
         )[0].strip()
 
         yield Metric("cpu_usage", usage, server.hostname)

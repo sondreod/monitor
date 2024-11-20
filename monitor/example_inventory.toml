@@ -1,0 +1,9 @@
+default_server_metrics = ["memory_usage", "ping"]
+
+[localhost]
+username = "monitor"
+collectors = ["number_of_metrics_collector"]
+
+[hostname.com]
+username = "debian"
+collectors = ["default_server_metrics", "my_cool_custom_collector"]
