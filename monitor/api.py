@@ -50,8 +50,7 @@ def f(query, start, end):
                 and timestamp <= {int(end)+5}
                 and name = '{name}'
                 {option_sql}
-            order by hostname"""
-    print(sql)
+            order by hostname, timestamp"""
     return db.execute(sql).fetchall()
 
 

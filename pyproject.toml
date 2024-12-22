@@ -10,8 +10,8 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "fabric",
     "fastapi[standard]",
+    "requests",
 ]
 
 [project.urls]
@@ -22,4 +22,5 @@ Documentation = "https://github.com/sondreod/monitor"
 dev = [
     "black",
     "isort",
+    "pyinfra",
 ]
